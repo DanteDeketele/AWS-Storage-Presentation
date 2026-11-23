@@ -1,0 +1,724 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Block storage &amp; Amazon EBS</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="progress"></div>
+<div id="viewport"><div id="stage">
+
+<!-- 1 ─────────────────────────────── titel -->
+<section class="slide dark center">
+  <img class="ico" src="icons/ebs.svg" alt="Amazon EBS" style="width:96px;height:96px">
+  <div class="kicker">Lab 06 · AWS Storage · Onderwerp 1</div>
+  <h1>Block storage<br><em>&amp; Amazon EBS</em></h1>
+  <p class="muted" style="max-width:1050px">Deze slides draaien zelf op AWS Lambda. Op de demo-slides maakt elke
+    <b class="acc">Run</b>-knop live echte EBS-resources aan in <code>eu-central-1</code>.</p>
+  <aside class="notes"><p>Welkom. Ons onderwerp is <b>block storage en Amazon EBS</b>, de "harde schijven" van AWS.</p>
+<p>Deze presentatie draait zelf op AWS: een Lambda-functie serveert de slides. Straks maken we live een echt EBS-volume aan in Frankfurt.</p>
+<p class="t">± 30 s</p></aside>
+</section>
+
+<!-- 2 ─────────────────────────────── agenda -->
+<section class="slide">
+  <h2><small>Agenda</small>Waar gaan we naartoe?</h2>
+  <div class="row grow" style="align-items:start">
+    <ol style="font-size:30px;line-height:1.8">
+      <li class="fade">Block vs file vs object storage</li>
+      <li class="fade">Amazon EBS in één beeld</li>
+      <li class="fade">Volumetypes en prijzen in Frankfurt</li>
+      <li class="fade">Snapshots, encryptie, vergroten</li>
+      <li class="fade">Instance store: wanneer ben je je data kwijt?</li>
+      <li class="fade"><b class="acc">Live demo</b> en wat het kost</li>
+    </ol>
+  </div>
+  <aside class="notes"><p>Eerst de basis: wat is block storage en hoe verschilt het van file en object storage.</p>
+<p>Dan EBS zelf: de volumetypes en prijzen, de features (snapshots, encryptie, vergroten) en het verschil met instance store.</p>
+<p>We eindigen met de live demo en wat die gekost heeft.</p>
+<p class="t">± 30 s · klik door de punten</p></aside>
+</section>
+
+<!-- 3 ─────────────────────────────── 3 soorten storage (klikbaar) -->
+<section class="slide">
+  <h2><small>Basis</small>Drie soorten storage</h2>
+  <div class="row">
+    <div class="card pick sel" data-kind="block"><div class="head"><img class="ico" src="icons/ebs.svg" alt=""><h3>Block</h3></div><p class="muted">Ruwe schijf, opgedeeld in blokken</p></div>
+    <div class="card pick" data-kind="file"><div class="head"><img class="ico" src="icons/efs.svg" alt=""><h3>File</h3></div><p class="muted">Mappen en bestanden, gedeeld</p></div>
+    <div class="card pick" data-kind="object"><div class="head"><img class="ico" src="icons/s3.svg" alt=""><h3>Object</h3></div><p class="muted">Key → object + metadata</p></div>
+  </div>
+  <div class="card detail grow" id="kind-detail"></div>
+  <aside class="notes"><p>AWS heeft drie grote soorten storage. Klik op elke kaart.</p>
+<ul><li><b>Block</b>: een ruwe schijf. Het OS zet er zelf een filesystem op. Snelst, voor databases en boot-schijven.</li>
+<li><b>File</b>: mappen en bestanden, gedeeld via NFS of SMB. Meerdere servers tegelijk.</li>
+<li><b>Object</b>: key + data + metadata in een bucket, via HTTPS. Goedkoop en onbeperkt schaalbaar.</li></ul>
+<p>Vuistregel: <i>één server, snel</i> → block · <i>delen</i> → file · <i>veel data, goedkoop</i> → object.</p>
+<p class="t">± 1 min</p></aside>
+</section>
+
+<!-- 4 ─────────────────────────────── vergelijkingstabel -->
+<section class="slide">
+  <h2><small>Vergelijking</small>Block · File · Object</h2>
+  <table>
+    <tr><th></th><th class="hl">Block</th><th>File</th><th>Object</th></tr>
+    <tr><td>Structuur</td><td class="hl">Blokken met een adres</td><td>Hiërarchie van mappen</td><td>Platte pool (bucket + key)</td></tr>
+    <tr><td>Metadata</td><td class="hl">Minimaal</td><td>Naam, grootte, datum</td><td>Uitgebreid, zelf te kiezen</td></tr>
+    <tr><td>Wijzigen</td><td class="hl">Enkel gewijzigde blokken</td><td>Deel van een bestand</td><td>Heel object opnieuw schrijven</td></tr>
+    <tr><td>Toegang</td><td class="hl">Als lokale schijf (NVMe)</td><td>NFS / SMB</td><td>HTTPS REST API</td></tr>
+    <tr><td>Gedeeld</td><td class="hl">Meestal 1 server</td><td>Veel servers tegelijk</td><td>Iedereen via de API</td></tr>
+    <tr><td>Kies als…</td><td class="hl">Database, boot-schijf, lage latency</td><td>Gedeelde mappen</td><td>Back-ups, media, data lake</td></tr>
+    <tr><td>AWS</td><td class="hl">EBS, instance store</td><td>EFS, FSx</td><td>S3</td></tr>
+  </table>
+  <aside class="notes"><p>Het belangrijkste verschil zit in de rij <b>Wijzigen</b>: bij block wordt enkel het gewijzigde blok herschreven, bij object het hele object. Daarom is block het snelst voor databases.</p>
+<p>Block hangt meestal aan <b>één server</b>; daarvoor heb je file storage als je wil delen.</p>
+<p>Onderaan: de AWS-diensten per type. Wij focussen op EBS.</p>
+<p class="t">± 1 min</p></aside>
+</section>
+
+<!-- 5 ─────────────────────────────── eigen schema -->
+<section class="slide" id="diagram-slide">
+  <h2><small>Eigen schema</small>Amazon EBS in één beeld</h2>
+  <div class="steps-nav">
+    <button data-d="0" class="on">Alles</button>
+    <button data-d="1">1 · Volume in één AZ</button>
+    <button data-d="2">2 · Instance store</button>
+    <button data-d="3">3 · Snapshot</button>
+    <button data-d="4">4 · Naar andere AZ</button>
+  </div>
+  <div class="grow">
+  <svg class="diagram" viewBox="0 0 1420 540" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#7aa116"/></marker></defs>
+    <!-- AWS Cloud-groep -->
+    <rect x="2" y="2" width="1416" height="536" fill="none" stroke="#232f3e" stroke-width="2"/>
+    <image href="icons/grp-cloud.svg" x="2" y="2" width="32" height="32"/>
+    <text x="42" y="24" class="glbl">AWS Cloud</text>
+    <!-- Region-groep -->
+    <rect x="22" y="44" width="1376" height="476" fill="none" stroke="#00a4a6" stroke-width="2" stroke-dasharray="8 5"/>
+    <image href="icons/grp-region.svg" x="22" y="44" width="32" height="32"/>
+    <text x="62" y="66" class="glbl" fill="#00a4a6" style="fill:#00a4a6">Region eu-central-1 (Frankfurt)</text>
+    <!-- AZ a -->
+    <g class="box" data-g="1 2">
+      <rect x="48" y="92" width="600" height="300" rx="4" fill="none" stroke="#147eba" stroke-width="2" stroke-dasharray="8 5"/>
+      <text x="62" y="116" class="glbl" style="fill:#147eba">Availability Zone eu-central-1a</text>
+    </g>
+    <g class="box" data-g="1 2">
+      <image href="icons/res-instance.svg" x="110" y="150" width="72" height="72"/>
+      <text x="146" y="245" class="c">EC2-instance</text>
+    </g>
+    <g class="box" data-g="1">
+      <image href="icons/res-gp3.svg" x="430" y="128" width="60" height="60"/>
+      <text x="460" y="206" class="c">Root volume · gp3 8 GB</text>
+      <image href="icons/res-gp3.svg" x="430" y="236" width="60" height="60"/>
+      <text x="460" y="314" class="c">Data volume · gp3 5 GB</text>
+      <line x1="190" y1="178" x2="420" y2="160" class="ln"/>
+      <line x1="190" y1="196" x2="420" y2="266" class="ln"/>
+      <text x="300" y="150" class="cs">via het netwerk</text>
+    </g>
+    <g class="box" data-g="2">
+      <rect x="86" y="290" width="120" height="72" rx="4" fill="#fff1ef" stroke="#d13212" stroke-width="2"/>
+      <text x="146" y="320" class="c" style="font-weight:700;fill:#d13212">Instance store</text>
+      <text x="146" y="342" class="cs">fysiek in de host</text>
+      <line x1="146" y1="252" x2="146" y2="290" class="ln" stroke-dasharray="5 4"/>
+    </g>
+    <!-- snapshot (regionaal) -->
+    <g class="box" data-g="3 4">
+      <rect x="700" y="410" width="672" height="92" rx="4" fill="#f4f8ec" stroke="#7aa116" stroke-width="2"/>
+      <image href="icons/res-snapshot.svg" x="722" y="424" width="64" height="64"/>
+      <text x="800" y="450" style="font-weight:700">EBS snapshot · regionaal</text>
+      <text x="800" y="476" style="fill:#545b64;font-size:14px">opgeslagen in S3 · incrementeel · kopieerbaar naar een andere regio</text>
+    </g>
+    <g class="box" data-g="3">
+      <path d="M500 300 C 600 360, 640 440, 696 452" class="flow" marker-end="url(#ah)"/>
+      <text x="560" y="420" class="cs" style="text-anchor:start">create-snapshot</text>
+    </g>
+    <!-- AZ b -->
+    <g class="box" data-g="4">
+      <rect x="700" y="92" width="672" height="290" rx="4" fill="none" stroke="#147eba" stroke-width="2" stroke-dasharray="8 5"/>
+      <text x="714" y="116" class="glbl" style="fill:#147eba">Availability Zone eu-central-1b</text>
+      <image href="icons/res-instance.svg" x="780" y="170" width="72" height="72"/>
+      <text x="816" y="265" class="c">EC2-instance</text>
+      <image href="icons/res-gp3.svg" x="1130" y="176" width="60" height="60"/>
+      <text x="1160" y="256" class="c">Nieuw volume uit snapshot</text>
+      <line x1="862" y1="206" x2="1120" y2="206" class="ln"/>
+      <path d="M1160 406 L 1160 272" class="flow" marker-end="url(#ah)"/>
+      <text x="1172" y="350" class="cs" style="text-anchor:start">create-volume</text>
+    </g>
+  </svg>
+  </div>
+  <p class="note muted" id="diagram-text"></p>
+  <aside class="notes"><p>Dit is ons eigen schema. Klik de stappen één voor één.</p>
+<ol><li><b>Volume in één AZ.</b> Een EBS-volume is een <i>netwerkschijf</i>, geen schijf in de server. Het leeft in één Availability Zone, hier eu-central-1a, en kan enkel aan een EC2-instance in diezelfde AZ. Binnen die AZ wordt het automatisch gerepliceerd. Root en data zijn allebei EBS-volumes.</li>
+<li><b>Instance store.</b> Het rode blok zit wél fysiek in de host. Supersnel, maar tijdelijk: weg bij stop of terminate. Komt straks nog terug.</li>
+<li><b>Snapshot.</b> Wil je het volume beschermen of verplaatsen, dan neem je een snapshot. Die staat in S3 en is <i>regionaal</i>: niet meer aan één AZ gebonden. Incrementeel: enkel gewijzigde blokken.</li>
+<li><b>Andere AZ.</b> Uit die snapshot maak je een nieuw volume in een andere AZ, of je kopieert hem naar een andere regio. Zo verhuis je een EBS-volume.</li></ol>
+<p>Kernboodschap: <b>volume = één AZ, snapshot = hele regio</b>.</p>
+<p class="t">± 1,5 min</p></aside>
+</section>
+
+<!-- 6 ─────────────────────────────── volumetypes -->
+<section class="slide">
+  <h2><small>Volumetypes · eu-central-1</small>gp3 · gp2 · io2 · st1 · sc1</h2>
+  <table style="font-size:19px">
+    <tr><th></th><th class="hl">gp3</th><th>gp2</th><th>io2 Block Express</th><th>st1</th><th>sc1</th></tr>
+    <tr><td>Media</td><td class="hl">SSD</td><td>SSD</td><td>SSD</td><td>HDD</td><td>HDD</td></tr>
+    <tr><td>Grootte</td><td class="hl">1 GiB–64 TiB</td><td>1 GiB–16 TiB</td><td>4 GiB–64 TiB</td><td>125 GiB–16 TiB</td><td>125 GiB–16 TiB</td></tr>
+    <tr><td>Max IOPS</td><td class="hl">80.000</td><td>16.000</td><td>256.000*</td><td>500</td><td>250</td></tr>
+    <tr><td>Max MiB/s</td><td class="hl">2.000</td><td>128–250</td><td>4.000</td><td>500</td><td>250</td></tr>
+    <tr><td>Inbegrepen</td><td class="hl">3.000 IOPS · 125 MiB/s</td><td>3 IOPS/GiB (min 100) + burst</td><td>—</td><td>40 MiB/s per TiB</td><td>12 MiB/s per TiB</td></tr>
+    <tr><td>Duurzaamheid</td><td class="hl">99,8–99,9%</td><td>99,8–99,9%</td><td>99,999%</td><td>99,8–99,9%</td><td>99,8–99,9%</td></tr>
+    <tr><td>Boot-volume</td><td class="hl">ja</td><td>ja</td><td>ja</td><td>nee</td><td>nee</td></tr>
+    <tr><td>$ / GB-maand</td><td class="hl">0,0952</td><td>0,119</td><td>0,149</td><td>0,054</td><td>0,018</td></tr>
+    <tr><td>Extra prestaties</td><td class="hl">$0,006/IOPS · $0,0476/MiB/s</td><td>—</td><td>$0,078/IOPS (≤32k)</td><td>—</td><td>—</td></tr>
+    <tr><td>Gebruik</td><td class="hl">Bijna alles</td><td>Legacy</td><td>&gt;80k IOPS, Multi-Attach</td><td>Grote sequentiële data</td><td>Koude data</td></tr>
+  </table>
+  <p class="note muted">* enkel op Nitro-instances · io1/io2 zijn geblokkeerd in het Howest-account · prijzen: AWS Price List API, 23/11/2026</p>
+  <aside class="notes"><p>Vijf types: drie SSD (gp3, gp2, io2) en twee HDD (st1, sc1).</p>
+<ul><li>Kijk naar de oranje kolom: gp3 gaat tot 80.000 IOPS en 64 TiB.</li>
+<li>io2 Block Express is voor extreme databases: 256.000 IOPS, 99,999% duurzaamheid, Multi-Attach. Geblokkeerd in ons Howest-account.</li>
+<li>HDD's zijn goedkoop maar niet bootbaar en enkel goed voor grote sequentiële data.</li></ul>
+<p>Prijzen zijn voor Frankfurt, uit de AWS Price List API. Frankfurt is ± 19% duurder dan us-east-1.</p>
+<p class="t">± 1,5 min</p></aside>
+</section>
+
+<!-- 7 ─────────────────────────────── calculator -->
+<section class="slide">
+  <h2><small>Waarom gp3?</small>Reken zelf: gp2 vs gp3</h2>
+  <div class="row grow">
+    <div class="card calc top">
+      <label>Grootte: <span class="val" id="c-size-v"></span></label>
+      <input type="range" id="c-size" min="10" max="2000" step="10" value="100">
+      <label>Nodige IOPS: <span class="val" id="c-iops-v"></span></label>
+      <input type="range" id="c-iops" min="100" max="16000" step="100" value="3000">
+      <p class="muted" style="font-size:20px;margin-top:26px">gp2 geeft 3 IOPS per GiB → voor meer IOPS moet je <b>meer GB kopen</b>.<br>
+        gp3 geeft 3.000 IOPS inbegrepen; extra IOPS koop je los (max. 500 IOPS per GiB).</p>
+    </div>
+    <div class="card">
+      <h3>gp2</h3>
+      <div class="price" id="c-gp2"></div><div class="muted" id="c-gp2-d" style="font-size:19px"></div>
+      <div class="bar"><div id="c-gp2-b" style="background:#879596"></div></div>
+      <h3 style="margin-top:30px">gp3</h3>
+      <div class="price acc" id="c-gp3"></div><div class="muted" id="c-gp3-d" style="font-size:19px"></div>
+      <div class="bar"><div id="c-gp3-b" style="background:var(--orange)"></div></div>
+      <p style="margin-top:18px" id="c-save"></p>
+    </div>
+  </div>
+  <aside class="notes"><p>Live voorbeeld: een database van 100 GB die 3.000 IOPS nodig heeft.</p>
+<p>Bij <b>gp2</b> krijg je 3 IOPS per GiB, dus moet je <b>1.000 GB</b> kopen: $119 per maand.</p>
+<p>Bij <b>gp3</b> zijn 3.000 IOPS inbegrepen: 100 GB is genoeg, $9,52 per maand.</p>
+<p>Schuif de IOPS omhoog: gp3 blijft goedkoper. Let op: gp3 heeft max. 500 IOPS per GiB.</p>
+<p class="t">± 1 min · laat het publiek een waarde kiezen</p></aside>
+</section>
+
+<!-- 8 ─────────────────────────────── waarom gp3 -->
+<section class="slide">
+  <h2><small>Conclusie</small>Vandaag kies je bijna altijd gp3</h2>
+  <div class="row">
+    <div class="card top fade"><h3>20% goedkoper</h3><p>$0,0952 i.p.v. $0,119 per GB-maand</p></div>
+    <div class="card top fade"><h3>3.000 IOPS inbegrepen</h3><p>Ook op een volume van 5 GB</p></div>
+    <div class="card top fade"><h3>Los schalen</h3><p>IOPS en throughput los van de grootte</p></div>
+  </div>
+  <div class="row">
+    <div class="card top fade"><h3>Geen burst credits</h3><p>Voorspelbare prestaties</p></div>
+    <div class="card top fade"><h3>Live migreren</h3><p>gp2 → gp3 zonder downtime</p></div>
+    <div class="card top fade"><h3>Wanneer niet?</h3><p>io2: &gt;80k IOPS · st1/sc1: goedkope HDD</p></div>
+  </div>
+  <aside class="notes"><p>Samengevat waarom gp3 de standaard is: goedkoper per GB, prestaties los van de grootte, geen burst credits, en een bestaand gp2-volume kun je live omzetten.</p>
+<p>Enkel als je meer dan 80.000 IOPS nodig hebt (io2) of goedkope HDD-opslag (st1/sc1) kies je iets anders.</p>
+<p class="t">± 45 s</p></aside>
+</section>
+
+<!-- 9 ─────────────────────────────── snapshots + encryptie -->
+<section class="slide">
+  <h2><small>Features</small>Snapshots en encryptie</h2>
+  <div class="row grow">
+    <div class="card top">
+      <div class="head"><img class="ico sm" src="icons/res-snapshot.svg" alt=""><h3>Snapshots</h3></div>
+      <ul>
+        <li class="fade">Point-in-time back-up in S3 (geen zichtbare bucket)</li>
+        <li class="fade"><b>Incrementeel</b>: enkel gewijzigde blokken</li>
+        <li class="fade">Tussenliggende snapshot verwijderen is veilig</li>
+        <li class="fade"><b>Regionaal</b> → nieuw volume in elke AZ</li>
+        <li class="fade">$0,054/GB-maand · archive $0,0135</li>
+      </ul>
+    </div>
+    <div class="card top">
+      <div class="head"><img class="ico sm" src="icons/kms.svg" alt=""><h3>Encryptie met AWS KMS</h3></div>
+      <ul>
+        <li class="fade">AES-256 met een data key uit <b>KMS</b></li>
+        <li class="fade">At rest, in transit EC2 ↔ volume, en snapshots</li>
+        <li class="fade"><b>Encryption by default</b>: instelling per regio</li>
+        <li class="fade">Bestaand volume: snapshot → versleuteld volume</li>
+        <li class="fade" style="font-size:20px">Howest-account: een SCP blokkeert <code>kms:Encrypt</code> → de demo-volumes zijn <b>niet</b> versleuteld</li>
+      </ul>
+    </div>
+  </div>
+  <aside class="notes"><p><b>Snapshots</b>: de eerste kopieert alle gebruikte blokken, de volgende enkel wat veranderde. Een tussenliggende verwijderen is veilig. Snapshots zijn regionaal.</p>
+<p><b>Encryptie</b>: EBS vraagt een data key aan KMS en versleutelt met AES-256 in de Nitro-hardware. Data at rest, het verkeer naar de instance en de snapshots zijn dan versleuteld.</p>
+<p>Een bestaand volume kun je niet zomaar versleutelen: via een snapshot maak je een versleutelde kopie.</p>
+<p>Bij Howest blokkeert een SCP KMS. Daarom zijn onze demo-volumes onversleuteld.</p>
+<p class="t">± 1,5 min</p></aside>
+</section>
+
+<!-- 10 ─────────────────────────────── vergroten -->
+<section class="slide">
+  <h2><small>Elastic Volumes</small>Vergroten zonder downtime</h2>
+  <div class="row">
+    <div class="card top fade"><h3>1 · AWS</h3><p><code>modify-volume --size 10</code></p><p class="muted">Bruikbaar zodra de state <code>optimizing</code> is</p></div>
+    <div class="card top fade"><h3>2 · Partitie</h3><p><code>growpart</code></p><p class="muted">Enkel als er een partitie is</p></div>
+    <div class="card top fade"><h3>3 · Filesystem</h3><p><code>xfs_growfs -d /data</code></p><p class="muted">of <code>resize2fs</code> voor ext4</p></div>
+  </div>
+  <div class="card fade">
+    <ul>
+      <li><b>Verkleinen kan niet</b></li>
+      <li>Volgende wijziging pas als de vorige <code>completed</code> is · max. <b>4 per 24 uur</b></li>
+      <li>Ook type, IOPS en throughput zijn live aanpasbaar</li>
+    </ul>
+  </div>
+  <aside class="notes"><p>Met Elastic Volumes vergroot je een volume terwijl het in gebruik is. Twee lagen:</p>
+<ol><li>AWS maakt de schijf groter (modify-volume). Bij "optimizing" is de ruimte al bruikbaar.</li>
+<li>Het OS ziet dat nog niet: je breidt partitie en filesystem uit.</li></ol>
+<p>Verkleinen kan niet. Max. 4 wijzigingen per 24 uur, en de vorige moet "completed" zijn.</p>
+<p>Dat doen we straks live.</p>
+<p class="t">± 1 min</p></aside>
+</section>
+
+<!-- 11 ─────────────────────────────── instance store simulator -->
+<section class="slide">
+  <h2><small>Instance store</small>Wanneer ben je je data kwijt?</h2>
+  <div class="row grow">
+    <div class="card">
+      <div class="disk kept" id="sim-ebs"><img class="ico sm" src="icons/res-volume.svg" alt=""><div><b>EBS-volume</b><div class="muted" style="font-size:17px">netwerkschijf in de AZ</div></div><span class="state">data OK</span></div>
+      <div class="disk kept" id="sim-is"><img class="ico sm" src="icons/res-instance.svg" alt=""><div><b>Instance store</b><div class="muted" style="font-size:17px">fysiek in de host</div></div><span class="state">data OK</span></div>
+      <div class="actions" style="margin-top:16px;flex-wrap:wrap">
+        <button class="btn" data-sim="reboot">Reboot</button>
+        <button class="btn" data-sim="stop">Stop / start</button>
+        <button class="btn" data-sim="hibernate">Hibernate</button>
+        <button class="btn" data-sim="terminate">Terminate</button>
+        <button class="btn" data-sim="fail">Schijf defect</button>
+        <button class="btn" data-sim="reset">Reset</button>
+      </div>
+      <p id="sim-text" class="muted" style="font-size:20px"></p>
+    </div>
+    <div class="card top">
+      <h3>Instance store</h3>
+      <ul>
+        <li>NVMe in de host: zeer snel, inbegrepen in de prijs (<code>m5d</code>, <code>i3</code>)</li>
+        <li>Weg bij stop, hibernate, terminate, defect, type wijzigen</li>
+        <li>Blijft bij een <b>reboot</b></li>
+        <li>Voor cache, buffers, scratch of data die elders gerepliceerd is</li>
+      </ul>
+    </div>
+  </div>
+  <aside class="notes"><p>Gebruik de simulator: klik Reboot (alles blijft), dan Stop (instance store is weg).</p>
+<p>Instance store is fysiek in de host. Bij een stop start je instance op een andere host, dus de oude schijf is weg. Ook bij hibernate, terminate of een defect.</p>
+<p>Goed voor cache en tijdelijke data, nooit voor iets dat je wil houden.</p>
+<p class="t">± 1 min</p></aside>
+</section>
+
+<!-- 12 ─────────────────────────────── demo intro -->
+<section class="slide dark center">
+  <div class="kicker">Live demo</div>
+  <h1>Een gp3-volume<br><em>van begin tot snapshot</em></h1>
+  <div class="row" style="max-width:1200px;margin-top:10px">
+    <div><img class="ico" src="icons/lambda.svg" alt=""><p class="muted" style="font-size:20px">Run-knop → Lambda roept de EC2-API aan</p></div>
+    <div><img class="ico" src="icons/ssm.svg" alt=""><p class="muted" style="font-size:20px">Commando's op de instance via SSM Run Command</p></div>
+    <div><img class="ico" src="icons/eventbridge.svg" alt=""><p class="muted" style="font-size:20px">Alles automatisch weg na 20 min</p></div>
+  </div>
+  <aside class="notes"><p>Nu de live demo. Elke Run-knop roept echt de AWS-API aan via onze Lambda.</p>
+<p>Commando's op de instance gaan via SSM Run Command: geen SSH nodig.</p>
+<p>Alles krijgt een tag en wordt automatisch opgeruimd, ten laatste na 20 minuten.</p>
+<p>Tip: open tussendoor <b>Architectuur</b> om live te zien wat er bestaat.</p></aside>
+</section>
+
+<!-- 13 ─────────────────────────────── demo 1: instance -->
+<section class="slide" data-demo>
+  <h2><small>Demo · stap 1</small>Demo-instance starten</h2>
+  <div class="demo-grid">
+    <div class="demo-left">
+      <div class="where"><img class="ico xs" src="icons/cloudshell.svg" alt="">AWS CLI</div>
+      <pre class="code">aws ec2 run-instances --instance-type t3.micro \
+  --image-id ami-… --subnet-id subnet-… \
+  --iam-instance-profile Name=ebs-demo-instance \
+  --instance-initiated-shutdown-behavior terminate</pre>
+      <div class="actions"><button class="btn primary" data-run="launch">Run</button><div class="spin"></div></div>
+      <p class="note muted">Amazon Linux 2023 in eu-central-1a. Geen SSH: we gebruiken SSM. Wacht tot de status <b>SSM Online</b> toont (± 1 min).</p>
+    </div>
+    <div class="demo-right"><div class="term-bar"><img src="icons/cloudshell.svg" alt="">Uitvoer</div><pre class="term"></pre></div>
+  </div>
+  <div class="live"></div>
+  <aside class="notes"><p>Klik <b>Run</b>. We starten een t3.micro met Amazon Linux 2023 in eu-central-1a.</p>
+<p>Wacht tot de statusbalk <b>SSM Online</b> toont (± 1 min). Vertel ondertussen: de instance zet zichzelf na 30 min uit, en de root is ook een gp3-volume.</p></aside>
+</section>
+
+<!-- 14 ─────────────────────────────── demo 2: volume -->
+<section class="slide" data-demo>
+  <h2><small>Demo · stap 2</small>gp3-volume maken en koppelen</h2>
+  <div class="demo-grid">
+    <div class="demo-left">
+      <div class="where"><img class="ico xs" src="icons/cloudshell.svg" alt="">AWS CLI</div>
+      <pre class="code">aws ec2 create-volume --availability-zone eu-central-1a \
+  --size 5 --volume-type gp3
+aws ec2 attach-volume --volume-id vol-… \
+  --instance-id i-… --device /dev/sdf</pre>
+      <div class="actions"><button class="btn primary" data-run="create_volume">Run</button><div class="spin"></div></div>
+      <div class="where"><img class="ico xs" src="icons/res-runcommand.svg" alt="">Op de instance</div>
+      <pre class="code">lsblk</pre>
+      <div class="actions"><button class="btn primary" data-run="shell" data-step="lsblk">Run</button><div class="spin"></div></div>
+      <p class="note muted">Zelfde AZ als de instance. Op Nitro verschijnt <code>/dev/sdf</code> als <code>nvme1n1</code>.</p>
+    </div>
+    <div class="demo-right"><div class="term-bar"><img src="icons/cloudshell.svg" alt="">Uitvoer</div><pre class="term"></pre></div>
+  </div>
+  <div class="live"></div>
+  <aside class="notes"><p>Run 1: volume van 5 GB gp3 in <b>dezelfde AZ</b>, daarna koppelen als /dev/sdf.</p>
+<p>Wijs in de uitvoer: 3.000 IOPS en 125 MiB/s, standaard inbegrepen.</p>
+<p>Run 2: lsblk. Het volume heet niet sdf maar <b>nvme1n1</b>: Nitro-instances tonen EBS als NVMe-schijf.</p></aside>
+</section>
+
+<!-- 15 ─────────────────────────────── demo 3: filesystem + mount -->
+<section class="slide" data-demo>
+  <h2><small>Demo · stap 3</small>Filesystem maken en mounten</h2>
+  <div class="demo-grid">
+    <div class="demo-left">
+      <div class="where"><img class="ico xs" src="icons/res-runcommand.svg" alt="">Op de instance</div>
+      <pre class="code">sudo mkfs -t xfs /dev/nvme1n1</pre>
+      <div class="actions"><button class="btn primary" data-run="shell" data-step="mkfs">Run</button><div class="spin"></div></div>
+      <div class="where"><img class="ico xs" src="icons/res-runcommand.svg" alt="">Op de instance</div>
+      <pre class="code">sudo mkdir -p /data
+sudo mount /dev/nvme1n1 /data
+echo "hallo EBS" | sudo tee /data/test.txt
+df -h /data</pre>
+      <div class="actions"><button class="btn primary" data-run="shell" data-step="mount">Run</button><div class="spin"></div></div>
+    </div>
+    <div class="demo-right"><div class="term-bar"><img src="icons/res-runcommand.svg" alt="">Uitvoer</div><pre class="term"></pre></div>
+  </div>
+  <div class="live"></div>
+  <aside class="notes"><p>Een nieuw volume is leeg: eerst een filesystem (xfs). Dan mounten op /data en een testbestand schrijven.</p>
+<p>df -h toont ± 5 G. Dat testbestand gebruiken we straks om te bewijzen dat er geen data verloren gaat.</p></aside>
+</section>
+
+<!-- 16 ─────────────────────────────── demo 4: vergroten -->
+<section class="slide" data-demo>
+  <h2><small>Demo · stap 4</small>Vergroten naar 10 GB, zonder downtime</h2>
+  <div class="demo-grid">
+    <div class="demo-left">
+      <div class="where"><img class="ico xs" src="icons/cloudshell.svg" alt="">AWS CLI</div>
+      <pre class="code">aws ec2 modify-volume --volume-id vol-… --size 10</pre>
+      <div class="actions"><button class="btn primary" data-run="modify">Run</button><div class="spin"></div></div>
+      <div class="where"><img class="ico xs" src="icons/res-runcommand.svg" alt="">Op de instance · zodra de status <code>optimizing</code> toont</div>
+      <pre class="code">lsblk /dev/nvme1n1
+sudo xfs_growfs -d /data
+df -h /data
+cat /data/test.txt</pre>
+      <div class="actions"><button class="btn primary" data-run="shell" data-step="grow">Run</button><div class="spin"></div></div>
+    </div>
+    <div class="demo-right"><div class="term-bar"><img src="icons/cloudshell.svg" alt="">Uitvoer</div><pre class="term"></pre></div>
+  </div>
+  <div class="live"></div>
+  <aside class="notes"><p>Run 1: modify-volume naar 10 GB (de opdracht zegt max. 10 GB). De instance blijft gewoon draaien.</p>
+<p>Wacht tot de statusbalk <b>optimizing</b> toont.</p>
+<p>Run 2: lsblk toont 10G, maar het filesystem nog 5G. xfs_growfs breidt het uit: df toont 10G en ons testbestand is er nog. Geen downtime.</p></aside>
+</section>
+
+<!-- 17 ─────────────────────────────── demo 5: snapshot -->
+<section class="slide" data-demo>
+  <h2><small>Demo · stap 5</small>Snapshot nemen</h2>
+  <div class="demo-grid">
+    <div class="demo-left">
+      <div class="where"><img class="ico xs" src="icons/cloudshell.svg" alt="">AWS CLI</div>
+      <pre class="code">aws ec2 create-snapshot --volume-id vol-… --description ebs-demo</pre>
+      <div class="actions"><button class="btn primary" data-run="snapshot">Run</button><div class="spin"></div></div>
+      <p class="note muted">De status volgt live: <code>pending</code> → <code>completed</code>. Enkel de gebruikte blokken worden bewaard.</p>
+    </div>
+    <div class="demo-right"><div class="term-bar"><img src="icons/cloudshell.svg" alt="">Uitvoer</div><pre class="term"></pre></div>
+  </div>
+  <div class="live"></div>
+  <aside class="notes"><p>Run: snapshot nemen. De status gaat van pending naar completed.</p>
+<p>Omdat het volume bijna leeg is, worden enkel de gebruikte blokken bewaard: dat kost bijna niets.</p></aside>
+</section>
+
+<!-- 18 ─────────────────────────────── demo 6: opruimen -->
+<section class="slide" data-demo>
+  <h2><small>Demo · stap 6</small>Opruimen</h2>
+  <div class="demo-grid">
+    <div class="demo-left">
+      <div class="where"><img class="ico xs" src="icons/cloudshell.svg" alt="">AWS CLI</div>
+      <pre class="code">aws ec2 delete-snapshot --snapshot-id snap-…
+aws ec2 terminate-instances --instance-ids i-…
+# data-volume: DeleteOnTermination=true</pre>
+      <div class="actions"><button class="btn danger" data-run="cleanup">Alles verwijderen</button><div class="spin"></div></div>
+      <div class="actions"><button class="btn" id="btn-log">Demo-log downloaden (vraag 2)</button></div>
+      <p class="note muted">AWS verwijdert storage <b>niet</b> automatisch. Hier doet onze reaper-Lambda dat elke 5 minuten.</p>
+    </div>
+    <div class="demo-right"><div class="term-bar"><img src="icons/cloudshell.svg" alt="">Uitvoer</div><pre class="term"></pre></div>
+  </div>
+  <div class="live"></div>
+  <aside class="notes"><p>Storage wordt bij AWS <b>niet</b> automatisch verwijderd, ook niet als je de instance stopt.</p>
+<p>Klik Alles verwijderen (twee keer). Snapshot weg, instance getermineerd, de volumes verdwijnen mee via DeleteOnTermination.</p>
+<p>Ons vangnet: een EventBridge-regel ruimt elke 5 minuten alles op wat ouder is dan 20 minuten.</p></aside>
+</section>
+
+<!-- 19 ─────────────────────────────── kosten -->
+<section class="slide">
+  <h2><small>Prijsvoorbeeld Frankfurt</small>Wat kostte deze demo?</h2>
+  <table>
+    <tr><th>Resource</th><th>Berekening</th><th>Prijs</th></tr>
+    <tr><td>t3.micro, 20 min</td><td>$0,012/u × 1/3</td><td>≈ $0,004</td></tr>
+    <tr><td>Publiek IPv4-adres, 20 min</td><td>$0,005/u × 1/3</td><td>≈ $0,002</td></tr>
+    <tr><td>gp3 8 + 10 GB, 20 min</td><td>18 × $0,0952 × 20 / 43.800 min</td><td>≈ $0,001</td></tr>
+    <tr><td><b>Totaal per demo</b></td><td></td><td><b>≈ $0,01</b></td></tr>
+    <tr><td>Ter vergelijking: gp3 10 GB, hele maand</td><td>10 × $0,0952</td><td>≈ $0,95</td></tr>
+    <tr><td>Zelfde als gp2</td><td>10 × $0,119</td><td>≈ $1,19</td></tr>
+    <tr><td>Snapshot (bijna leeg)</td><td>gebruikte blokken × $0,054</td><td>&lt; $0,01</td></tr>
+    <tr><td>Deze website (Lambda)</td><td>binnen de gratis Lambda-quota</td><td>≈ $0</td></tr>
+  </table>
+  <p class="muted">EC2 wordt bij Howest na 12 u gestopt, maar <b>volumes en snapshots blijven</b> → altijd zelf opruimen.</p>
+  <aside class="notes"><p>Een volledige demo van 20 minuten kost ongeveer één cent: vooral de instance en het publieke IP.</p>
+<p>De storage zelf is goedkoop per uur, maar een vergeten volume betaal je elke maand opnieuw. Ter vergelijking: 10 GB gp3 kost $0,95 per maand, als gp2 $1,19.</p></aside>
+</section>
+
+<!-- 20 ─────────────────────────────── samenvatting -->
+<section class="slide dark center">
+  <h2><small>Samenvatting</small>Drie dingen om te onthouden</h2>
+  <ol style="font-size:34px;line-height:1.7">
+    <li class="fade">Block storage = ruwe schijf, snelst, aan één server → <b class="acc">EBS</b></li>
+    <li class="fade">Kies <b class="acc">gp3</b>: goedkoper, 3.000 IOPS inbegrepen</li>
+    <li class="fade">EBS leeft in <b>één AZ</b> · snapshots zijn regionaal · instance store is weg na stop</li>
+  </ol>
+  <aside class="notes"><p>Drie dingen om te onthouden:</p>
+<ol><li>Block storage = ruwe schijf, snelst, aan één server → EBS.</li>
+<li>Kies gp3.</li>
+<li>Volume in één AZ, snapshot regionaal, instance store weg na stop.</li></ol>
+<p>Daarna: vragen.</p></aside>
+</section>
+
+<!-- 21 ─────────────────────────────── bronnen -->
+<section class="slide">
+  <h2><small>Bronnen</small>Officiële AWS-documentatie</h2>
+  <ul style="font-family:var(--mono);font-size:19px;line-height:1.7">
+    <li>docs.aws.amazon.com/ebs/latest/userguide/ebs-volume-types.html</li>
+    <li>docs.aws.amazon.com/ebs/latest/userguide/general-purpose.html</li>
+    <li>docs.aws.amazon.com/ebs/latest/userguide/provisioned-iops.html</li>
+    <li>docs.aws.amazon.com/ebs/latest/userguide/hdd-vols.html</li>
+    <li>docs.aws.amazon.com/ebs/latest/userguide/ebs-snapshots.html</li>
+    <li>docs.aws.amazon.com/ebs/latest/userguide/how-ebs-encryption-works.html</li>
+    <li>docs.aws.amazon.com/ebs/latest/userguide/ebs-modify-volume.html</li>
+    <li>docs.aws.amazon.com/ebs/latest/userguide/recognize-expanded-volume-linux.html</li>
+    <li>docs.aws.amazon.com/ebs/latest/userguide/nvme-ebs-volumes.html</li>
+    <li>docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-store-lifetime.html</li>
+    <li>aws.amazon.com/compare/the-difference-between-block-file-object-storage/</li>
+    <li>Prijzen: AWS Price List API, EU (Frankfurt), opgevraagd 23/11/2026</li>
+    <li>Iconen: AWS Architecture Icons (aws.amazon.com/architecture/icons), release 07/2026</li>
+  </ul>
+  <aside class="notes"><p>Alles komt uit de officiële AWS-documentatie. De prijzen hebben we opgevraagd via de AWS Price List API, de iconen komen uit het officiële AWS Architecture Icons-pakket.</p>
+<p>Vragen?</p></aside>
+</section>
+
+</div></div>
+
+<div id="keybar">Klik Volgende of gebruik ← → · F volledig scherm · P PDF</div>
+<div id="hud">
+  <button id="nav-prev" title="Vorige">‹ Vorige</button>
+  <span id="counter"></span>
+  <button id="nav-next" class="next" title="Volgende">Volgende ›</button>
+  <button id="nav-full" title="Volledig scherm">Volledig scherm</button>
+  <button id="btn-notes" title="Sprekersnotities (N)">Notities</button>
+  <button id="btn-presenter" title="Apart venster met notities, volgende slide en timer">Presentator</button>
+  <button id="btn-arch" class="arch-btn" title="Schema van de volledige AWS-opstelling (A)">Architectuur</button>
+  <button id="btn-key" title="Demo-sleutel instellen">Sleutel</button>
+  <button onclick="window.print()">PDF</button>
+</div>
+<div id="keydlg"><form>
+  <b>Demo-sleutel</b>
+  <span class="muted" style="font-size:14px">terraform output -raw demo_key</span>
+  <input id="keyinput" autocomplete="off">
+  <div class="actions"><button class="btn primary" type="submit">Opslaan</button><button class="btn" type="button" id="keycancel">Annuleren</button></div>
+</form></div>
+<!-- ─────────────────────────────── architectuur-overlay (op elke slide via de knop "Architectuur") -->
+<div id="arch" aria-hidden="true">
+  <div class="arch-panel">
+    <div class="arch-head">
+      <h2>Hoe deze presentatie op AWS draait</h2>
+      <div class="arch-tabs">
+        <button data-tab="schema" class="on">Schema</button>
+        <button data-tab="terraform">Terraform</button>
+        <button data-tab="cmds">Commando's</button>
+      </div>
+      <button class="arch-close" id="arch-close" title="Sluiten">Sluiten ✕</button>
+    </div>
+
+    <!-- ── tab 1: schema ── -->
+    <div class="arch-tab on" data-tab="schema">
+      <svg class="diagram arch-svg" viewBox="0 0 1420 640">
+        <defs>
+          <marker id="aa" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#232f3e"/></marker>
+          <marker id="ag" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#7aa116"/></marker>
+        </defs>
+
+        <!-- buiten AWS -->
+        <image href="icons/res-client.svg" x="44" y="70" width="64" height="64"/>
+        <text x="76" y="154" class="c" style="font-weight:700">Laptop</text>
+        <text x="76" y="172" class="cs">Terraform</text>
+        <image href="icons/res-user.svg" x="44" y="290" width="64" height="64"/>
+        <text x="76" y="374" class="c" style="font-weight:700">Presentator</text>
+        <text x="76" y="392" class="cs">met demo-sleutel</text>
+        <image href="icons/res-users.svg" x="44" y="460" width="64" height="64"/>
+        <text x="76" y="544" class="c" style="font-weight:700">Klas</text>
+        <text x="76" y="562" class="cs">kijkmodus</text>
+
+        <!-- AWS Cloud -->
+        <rect x="170" y="14" width="1236" height="612" fill="none" stroke="#232f3e" stroke-width="2"/>
+        <image href="icons/grp-cloud.svg" x="170" y="14" width="32" height="32"/>
+        <text x="210" y="36" class="glbl">AWS Cloud · Howest-account</text>
+        <!-- Region -->
+        <rect x="188" y="54" width="1200" height="556" fill="none" stroke="#00a4a6" stroke-width="2" stroke-dasharray="8 5"/>
+        <image href="icons/grp-region.svg" x="188" y="54" width="32" height="32"/>
+        <text x="228" y="76" class="glbl" style="fill:#00a4a6">Region eu-central-1 (Frankfurt)</text>
+
+        <!-- Groep A: altijd aan -->
+        <rect x="208" y="96" width="560" height="496" rx="6" fill="#fffaf2" stroke="#ff9900" stroke-width="2"/>
+        <text x="224" y="122" class="glbl" style="fill:#ec7211">Altijd aan · serverless · ≈ $0 per week</text>
+
+        <image href="icons/res-lambda.svg" x="250" y="150" width="64" height="64"/>
+        <text x="282" y="234" class="c" style="font-weight:700">Lambda ebs-demo</text>
+        <text x="282" y="252" class="cs">Function URL (HTTPS)</text>
+        <text x="282" y="268" class="cs">slides + /api + reaper</text>
+        <text x="282" y="284" class="cs live-f" data-f="fn"></text>
+
+        <image href="icons/res-rule.svg" x="250" y="330" width="64" height="64"/>
+        <text x="282" y="414" class="c" style="font-weight:700">EventBridge-regel</text>
+        <text x="282" y="432" class="cs">rate(5 minutes) → reaper</text>
+
+        <image href="icons/res-logs.svg" x="470" y="150" width="56" height="56"/>
+        <text x="498" y="226" class="c" style="font-weight:700">CloudWatch Logs</text>
+        <text x="498" y="244" class="cs">7 dagen bewaard</text>
+
+        <image href="icons/res-role.svg" x="470" y="300" width="56" height="56"/>
+        <text x="498" y="376" class="c" style="font-weight:700">IAM-rollen</text>
+        <text x="498" y="394" class="cs">lambda: enkel tag Project=ebs-demo-live</text>
+        <text x="498" y="410" class="cs">instance: SSM-toegang</text>
+
+        <image href="icons/ssm.svg" x="470" y="460" width="56" height="56"/>
+        <text x="498" y="536" class="c" style="font-weight:700">Systems Manager</text>
+        <text x="498" y="554" class="cs">Run Command</text>
+
+        <rect x="236" y="470" width="190" height="96" rx="4" fill="#fff" stroke="#d5dbdb"/>
+        <text x="331" y="496" class="c" style="font-weight:700;font-size:14px">In de Lambda-zip</text>
+        <text x="331" y="518" class="cs">index.html · style.css · js</text>
+        <text x="331" y="536" class="cs">icons/ · app.py</text>
+        <text x="331" y="554" class="cs">config.json (sleutel, ID's)</text>
+
+        <!-- Groep B: enkel tijdens de demo -->
+        <rect x="800" y="96" width="572" height="380" rx="6" fill="none" stroke="#8c4fff" stroke-width="2"/>
+        <image href="icons/grp-vpc.svg" x="800" y="96" width="32" height="32"/>
+        <text x="840" y="118" class="glbl" style="fill:#8c4fff">Default VPC</text>
+        <text x="1356" y="118" class="cs" style="text-anchor:end;font-weight:700;fill:#d13212">enkel tijdens de demo · max. 20 min</text>
+        <rect x="820" y="138" width="532" height="320" fill="none" stroke="#147eba" stroke-width="2" stroke-dasharray="8 5"/>
+        <text x="834" y="160" class="glbl" style="fill:#147eba">Availability Zone eu-central-1a</text>
+        <rect x="840" y="172" width="492" height="270" fill="#f2f6e8" stroke="#7aa116" stroke-width="1.5"/>
+        <image href="icons/grp-subnet.svg" x="840" y="172" width="28" height="28"/>
+        <text x="876" y="191" class="glbl" style="fill:#3f8624;font-size:14px" data-f="subnet">Public subnet (default)</text>
+        <rect x="860" y="208" width="452" height="218" rx="4" fill="#fff" stroke="#d13212" stroke-width="1.5" stroke-dasharray="4 3"/>
+        <text x="874" y="228" style="font-size:13px;fill:#d13212;font-weight:700" data-f="sg">Security group ebs-demo-instance · geen inbound</text>
+
+        <g data-res="instance" class="res">
+          <rect class="livebox" x="880" y="238" width="112" height="176" rx="6"/>
+          <image href="icons/res-instance.svg" x="900" y="252" width="72" height="72"/>
+          <text x="936" y="344" class="c" style="font-weight:700">EC2 t3.micro</text>
+          <text x="936" y="362" class="cs live-f" data-f="inst1">niet actief</text>
+          <text x="936" y="378" class="cs live-f" data-f="inst2"></text>
+          <text x="936" y="394" class="cs live-f" data-f="inst3"></text>
+        </g>
+        <g data-res="instance" class="res">
+          <rect class="livebox" x="1040" y="236" width="112" height="120" rx="6"/>
+          <image href="icons/res-gp3.svg" x="1070" y="244" width="52" height="52"/>
+          <text x="1096" y="314" class="c" data-f="root0">root · gp3 8 GB</text>
+          <text x="1096" y="332" class="cs live-f" data-f="root1"></text>
+        </g>
+        <g data-res="volume" class="res">
+          <rect class="livebox" x="1162" y="236" width="128" height="160" rx="6"/>
+          <image href="icons/res-gp3.svg" x="1200" y="244" width="52" height="52"/>
+          <text x="1226" y="314" class="c" data-f="vol0">data · gp3 5→10 GB</text>
+          <text x="1226" y="332" class="cs live-f" data-f="vol1">niet aangemaakt</text>
+          <text x="1226" y="348" class="cs live-f" data-f="vol2"></text>
+          <text x="1226" y="364" class="cs live-f" data-f="vol3"></text>
+          <text x="1226" y="380" class="cs live-f" data-f="vol4"></text>
+        </g>
+        <line x1="980" y1="282" x2="1066" y2="272" class="ln"/>
+        <path d="M980 292 C 1080 360, 1150 350, 1200 290" class="ln"/>
+
+        <g data-res="snapshot" class="res">
+          <rect x="800" y="500" width="572" height="92" rx="6" fill="#f4f8ec" stroke="#7aa116" stroke-width="2"/>
+          <image href="icons/res-snapshot.svg" x="820" y="514" width="60" height="60"/>
+          <text x="896" y="540" style="font-weight:700">EBS snapshot · regionaal</text>
+          <text x="896" y="564" class="live-f" data-f="snap" style="fill:#545b64;font-size:14px">nog geen snapshot</text>
+        </g>
+
+        <!-- pijlen -->
+        <path d="M112 102 C 160 102, 180 110, 206 120" class="ln" marker-end="url(#aa)" stroke-dasharray="6 4"/>
+        <text x="122" y="88" class="cs" style="text-anchor:start">terraform apply</text>
+        <path d="M112 322 C 170 300, 200 200, 246 184" class="ln" marker-end="url(#aa)"/>
+        <path d="M112 492 C 180 470, 200 230, 246 196" class="ln" marker-end="url(#aa)"/>
+        <text x="186" y="290" class="cs" style="text-anchor:start">HTTPS</text>
+        <path d="M282 330 L 282 276" class="ln" marker-end="url(#aa)"/>
+        <path d="M318 180 L 464 178" class="ln" marker-end="url(#aa)"/>
+        <path d="M318 196 C 640 210, 760 260, 896 284" class="flow" marker-end="url(#ag)"/>
+        <text x="640" y="236" class="cs" style="text-anchor:start">EC2-API: run / create / modify</text>
+        <path d="M530 490 C 700 470, 800 400, 900 330" class="flow" marker-end="url(#ag)"/>
+        <text x="640" y="452" class="cs" style="text-anchor:start">SSM: mkfs / mount / xfs_growfs</text>
+        <path d="M1226 336 L 1226 498" class="flow" marker-end="url(#ag)"/>
+        <text x="1236" y="470" class="cs" style="text-anchor:start">create-snapshot</text>
+      </svg>
+      <div class="arch-live" id="arch-live">live status laden…</div>
+      <p class="note muted">Groen omkaderd = bestaat nu in AWS (elke 4 s opgehaald). Oranje groep = door Terraform beheerd en altijd aan. Paarse VPC-groep en snapshot = enkel tijdens de demo, aangemaakt door de Run-knoppen.</p>
+    </div>
+
+    <!-- ── tab 2: terraform ── -->
+    <div class="arch-tab" data-tab="terraform">
+      <p class="note">Alles staat in <code>terraform/main.tf</code>. Terraform beheert enkel het permanente deel. De demo-EC2, volumes en snapshots zitten <b>niet</b> in Terraform: die maakt de Lambda live aan, en ze worden automatisch opgeruimd.</p>
+      <div class="tf-grid">
+        <div class="card top"><div class="head"><img class="ico sm" src="icons/res-lambda.svg" alt=""><h3>Website + API</h3></div>
+          <ul class="tf"><li><code>aws_lambda_function.app</code> · Python 3.13</li><li><code>aws_lambda_function_url.app</code> · publieke HTTPS-URL</li><li><code>aws_lambda_permission.url</code>, <code>.url_invoke</code></li><li><code>data.archive_file.app</code> · zipt <code>app/</code></li><li><code>local_sensitive_file.config</code> · <code>config.json</code></li><li><code>aws_cloudwatch_log_group.app</code> · 7 dagen</li></ul></div>
+        <div class="card top"><div class="head"><img class="ico sm" src="icons/res-rule.svg" alt=""><h3>Automatisch opruimen</h3></div>
+          <ul class="tf"><li><code>aws_cloudwatch_event_rule.reaper</code> · rate(5 minutes)</li><li><code>aws_cloudwatch_event_target.reaper</code> → Lambda</li><li><code>aws_lambda_permission.reaper</code></li><li><code>var.max_age_min</code> = 20</li></ul></div>
+        <div class="card top"><div class="head"><img class="ico sm" src="icons/res-role.svg" alt=""><h3>Rechten (IAM)</h3></div>
+          <ul class="tf"><li><code>aws_iam_role.lambda</code> + <code>aws_iam_role_policy.lambda</code><br><span class="muted">enkel t3.micro, gp3, en resources met de demo-tag</span></li><li><code>aws_iam_role.instance</code> + <code>AmazonSSMManagedInstanceCore</code></li><li><code>aws_iam_instance_profile.instance</code></li></ul></div>
+        <div class="card top"><div class="head"><img class="ico sm" src="icons/grp-vpc.svg" alt=""><h3>Netwerk &amp; overig</h3></div>
+          <ul class="tf"><li><code>data.aws_vpc.default</code>, <code>data.aws_subnet.demo</code> (1a)</li><li><code>aws_security_group.demo</code> · geen inbound</li><li><code>data.aws_ami.al2023</code> · nieuwste AL2023</li><li><code>random_password.demo_key</code></li></ul></div>
+      </div>
+      <p class="note muted">Waarom geen environment variables? Het Howest-account blokkeert <code>kms:Encrypt</code> via een SCP. Daarom gaat de configuratie als <code>config.json</code> mee in de zip, en zijn de demo-volumes onversleuteld.</p>
+    </div>
+
+    <!-- ── tab 3: commando's ── -->
+    <div class="arch-tab" data-tab="cmds">
+      <div class="cmd-grid">
+        <div><div class="where">1 · Initialiseren (eenmalig)</div><pre class="code">cd terraform
+terraform init</pre></div>
+        <div><div class="where">2 · Bekijken wat er gebeurt</div><pre class="code">terraform plan</pre></div>
+        <div><div class="where">3 · Opzetten of bijwerken</div><pre class="code">terraform apply</pre></div>
+        <div><div class="where">4 · Link voor de klas</div><pre class="code">terraform output url</pre></div>
+        <div><div class="where">5 · Demo-sleutel (presentator)</div><pre class="code">terraform output -raw demo_key</pre></div>
+        <div><div class="where">6 · Link mét sleutel</div><pre class="code">terraform output -raw presenter_url</pre></div>
+        <div><div class="where">7 · Alles afbreken na de week</div><pre class="code">terraform destroy</pre></div>
+        <div><div class="where">8 · Controle: niets achtergebleven</div><pre class="code">aws ec2 describe-volumes --region eu-central-1 \
+  --filters Name=tag:Project,Values=ebs-demo-live \
+  --query "Volumes[].VolumeId"</pre></div>
+      </div>
+      <p class="note muted">Na een wijziging aan <code>app/</code> volstaat <code>terraform apply</code>: enkel de Lambda-code wordt vervangen, de URL en de sleutel blijven dezelfde.</p>
+    </div>
+  </div>
+</div>
+<div id="laser"></div>
+<div id="notes-bar"><button class="nb-close" title="Sluiten">✕</button><div class="nb-body"></div></div>
+<div id="gloss-pop" role="dialog"></div>
+<div id="gloss-deep" aria-hidden="true"><div class="gd-slide">
+  <div class="gd-body"></div>
+  <button class="btn gd-back">← Terug naar de presentatie</button>
+</div></div>
+<script src="deck.js"></script>
+<script src="demo.js"></script>
+<script src="glossary.js"></script>
+<script src="notes.js"></script>
+</body>
+</html>

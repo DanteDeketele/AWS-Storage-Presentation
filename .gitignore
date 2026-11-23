@@ -1,0 +1,6 @@
+.terraform/
+*.tfstate
+*.tfstate.*
+terraform/.build/
+__pycache__/
+app/config.json
