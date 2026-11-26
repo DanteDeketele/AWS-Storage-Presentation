@@ -192,6 +192,10 @@ def shell(body):
     if step not in SHELL:
         raise ValueError("Onbekende stap")
     i = need_instance()
+    info = ssm.describe_instance_information(
+        Filters=[{"Key": "InstanceIds", "Values": [i["InstanceId"]]}])["InstanceInformationList"]
+    if not info or info[0]["PingStatus"] != "Online":
+        raise ValueError("De SSM-agent is nog niet online. Wacht tot de statusbalk 'SSM Online' toont (± 1 min).")
     script = SHELL[step]["run"]
     if "{serial}" in script:
         script = script.format(serial=need_volume()["VolumeId"].replace("-", ""))
@@ -227,6 +231,27 @@ def snapshot(_):
                       f"VolumeSize: {s['VolumeSize']} GiB\nEncrypted:  {s['Encrypted']}"}
 
 
+def snapshot_status(_):
+    snaps = snapshots()
+    if not snaps:
+        raise ValueError("Geen demo-snapshot. Voer eerst de snapshot-stap uit.")
+    s = snaps[0]
+    return {"cmd": f"aws ec2 describe-snapshots --snapshot-ids {s['SnapshotId']}",
+            "output": f"SnapshotId: {s['SnapshotId']}\nState:      {s['State']}\nProgress:   {s.get('Progress')}\n"
+                      f"VolumeSize: {s['VolumeSize']} GiB\nStartTime:  {s['StartTime']:%Y-%m-%d %H:%M:%S} UTC"}
+
+
+def verify(_):
+    """Controle na het opruimen: bestaat er nog iets met de demo-tag?"""
+    vols = [v["VolumeId"] + " (" + v["State"] + ")" for v in volumes(data_only=False)]
+    snaps = [s["SnapshotId"] for s in snapshots()]
+    inst = [i["InstanceId"] + " (" + i["State"]["Name"] + ")" for i in instances()]
+    return {"cmd": f"aws ec2 describe-instances --filters Name=tag:Project,Values={TAG}\n"
+                   f"aws ec2 describe-volumes --filters Name=tag:Project,Values={TAG}\n"
+                   f"aws ec2 describe-snapshots --owner-ids self --filters Name=tag:Project,Values={TAG}",
+            "output": f"Instances: {inst or '[]'}\nVolumes:   {vols or '[]'}\nSnapshots: {snaps or '[]'}"}
+
+
 def cleanup(_, older_than_min=None):
     """Verwijdert alle demo-resources (of enkel die ouder dan older_than_min)."""
     cutoff = now() - dt.timedelta(minutes=older_than_min) if older_than_min else None
@@ -255,7 +280,7 @@ def cleanup(_, older_than_min=None):
     return {"cmd": "\n".join(cmds) or "# niets op te ruimen", "output": "\n".join(done)}
 
 
-ACTIONS = {"launch": launch, "create_volume": create_volume, "shell": shell,
+ACTIONS = {"snapshot_status": snapshot_status, "verify": verify, "launch": launch, "create_volume": create_volume, "shell": shell,
            "output": output, "modify": modify, "snapshot": snapshot, "cleanup": cleanup}
 
 

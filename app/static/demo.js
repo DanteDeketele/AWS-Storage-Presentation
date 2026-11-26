@@ -85,7 +85,7 @@ document.querySelectorAll('[data-run]').forEach(btn => btn.addEventListener('cli
       out = st.output + (ok ? '' : `\n[${st.status}]`);
     }
     if (out) log(slide, esc(out));
-    log(slide, `<span class="${ok ? 'ok' : 'err'}">${ok ? '✓' : '✗'} ${((performance.now() - t0) / 1000).toFixed(1)} s</span>\n`);
+    log(slide, `<span class="${ok ? 'ok' : 'err'} timing">${ok ? '✓' : '✗'} ${((performance.now() - t0) / 1000).toFixed(1)} s</span>\n`);
   } catch (e) {
     log(slide, `<span class="err">✗ ${esc(e.message)}</span>\n`);
   } finally {
@@ -114,7 +114,7 @@ function render() {
   if (v) {
     const a = age(v.created); oldest = Math.max(oldest, a);
     cost += a / 60 * v.size * PRICE.gp3GbHour;
-    const m = v.modification ? ` · ${v.modification.state}${v.modification.progress != null ? ' ' + v.modification.progress + '%' : ''}` : '';
+    const m = v.modification && v.state !== 'deleting' ? ` · ${v.modification.state}${v.modification.progress != null ? ' ' + v.modification.progress + '%' : ''}` : '';
     parts.push(pill('res-gp3', `<b>${v.id}</b> ${v.size} GiB · ${v.iops} IOPS · ${v.state}${m}`));
   } else parts.push(pill('res-gp3', 'geen volume', 'none'));
   snaps.forEach(s => parts.push(pill('res-snapshot', `<b>${s.id}</b> ${s.state} ${s.progress || ''}`)));
@@ -149,7 +149,7 @@ function renderArch(cost, oldest) {
   setF('root0', r ? `root · ${r.type} ${r.size} GiB` : 'root · gp3 8 GB');
   setF('root1', r ? `${r.id} · ${r.state}` : '');
   if (v) {
-    const m = v.modification;
+    const m = v.state === 'deleting' ? null : v.modification;
     setF('vol0', `data · ${v.type} ${v.size} GiB`);
     setF('vol1', v.id);
     setF('vol2', `${v.iops} IOPS · ${v.throughput} MiB/s`);
@@ -229,10 +229,14 @@ document.getElementById('btn-log').addEventListener('click', () => {
   const parts = [...document.querySelectorAll('.slide[data-demo]')].map(sl => {
     const h = sl.querySelector('h2').cloneNode(true); h.querySelectorAll('small').forEach(x => x.remove());
     const step = sl.querySelector('h2 small')?.textContent || '';
-    const out = sl.querySelector('.term').innerText.trim();
+    const t = sl.querySelector('.term').cloneNode(true);
+    t.querySelectorAll('.err, .timing, .info').forEach(x => x.remove());
+    const out = t.textContent.replace(/\n{3,}/g, '\n\n').trim();
     return `===== ${step} · ${h.textContent.trim()} =====\n${out || '(niet uitgevoerd)'}\n`;
   });
-  const head = `EBS-demo · eu-central-1 · ${new Date().toLocaleString('nl-BE')}\n\n`;
+  const head = `EBS-demo · eu-central-1 · ${new Date().toLocaleString('nl-BE')}\n`
+    + `De aws-regels zijn de equivalente AWS CLI-commando's, uitgevoerd via een Lambda-functie met de AWS SDK (boto3).\n`
+    + `De commando's op de instance liepen via SSM Run Command.\n\n`;
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([head + parts.join('\n')], { type: 'text/plain' }));
   a.download = 'ebs-demo-log.txt';

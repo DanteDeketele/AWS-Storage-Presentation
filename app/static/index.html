@@ -429,6 +429,9 @@ cat /data/test.txt</pre>
       <div class="where"><img class="ico xs" src="icons/cloudshell.svg" alt="">AWS CLI</div>
       <pre class="code">aws ec2 create-snapshot --volume-id vol-… --description ebs-demo</pre>
       <div class="actions"><button class="btn primary" data-run="snapshot">Run</button><div class="spin"></div></div>
+      <div class="where"><img class="ico xs" src="icons/cloudshell.svg" alt="">AWS CLI · even later</div>
+      <pre class="code">aws ec2 describe-snapshots --snapshot-ids snap-…</pre>
+      <div class="actions"><button class="btn primary" data-run="snapshot_status">Run</button><div class="spin"></div></div>
       <p class="note muted">De status volgt live: <code>pending</code> → <code>completed</code>. Enkel de gebruikte blokken worden bewaard.</p>
     </div>
     <div class="demo-right"><div class="term-bar"><img src="icons/cloudshell.svg" alt="">Uitvoer</div><pre class="term"></pre></div>
@@ -448,6 +451,9 @@ cat /data/test.txt</pre>
 aws ec2 terminate-instances --instance-ids i-…
 # data-volume: DeleteOnTermination=true</pre>
       <div class="actions"><button class="btn danger" data-run="cleanup">Alles verwijderen</button><div class="spin"></div></div>
+      <div class="where"><img class="ico xs" src="icons/cloudshell.svg" alt="">AWS CLI · controle (± 1 min na het opruimen)</div>
+      <pre class="code">aws ec2 describe-volumes --filters Name=tag:Project,Values=ebs-demo-live</pre>
+      <div class="actions"><button class="btn primary" data-run="verify">Run</button><div class="spin"></div></div>
       <div class="actions"><button class="btn" id="btn-log">Demo-log downloaden (vraag 2)</button></div>
       <p class="note muted">AWS verwijdert storage <b>niet</b> automatisch. Hier doet onze reaper-Lambda dat elke 5 minuten.</p>
     </div>
@@ -523,6 +529,7 @@ aws ec2 terminate-instances --instance-ids i-…
   <span id="counter"></span>
   <button id="nav-next" class="next" title="Volgende">Volgende ›</button>
   <button id="nav-full" title="Volledig scherm">Volledig scherm</button>
+  <button id="btn-sound" title="Geluidseffecten aan/uit">Geluid aan</button>
   <button id="btn-notes" title="Sprekersnotities (N)">Notities</button>
   <button id="btn-presenter" title="Apart venster met notities, volgende slide en timer">Presentator</button>
   <button id="btn-arch" class="arch-btn" title="Schema van de volledige AWS-opstelling (A)">Architectuur</button>
@@ -720,5 +727,6 @@ terraform init</pre></div>
 <script src="demo.js"></script>
 <script src="glossary.js"></script>
 <script src="notes.js"></script>
+<script src="sound.js"></script>
 </body>
 </html>

@@ -75,6 +75,7 @@ function openPresenter() {
   #p-now{outline:3px solid #ff9900;cursor:pointer}
   .p-stage{position:absolute;left:0;top:0;width:1600px;height:900px;transform-origin:0 0;pointer-events:none}
   .p-stage .slide{opacity:1!important;transform:none!important}
+  .p-stage *,.p-stage *::before{transition:none!important;animation:none!important}
   .p-end{display:grid;place-items:center;height:100%;color:#545b64;font:700 18px Arial}
   #p-notes{flex:1;overflow:auto;background:#fff;color:#16191f;border-radius:6px;padding:14px 18px;font-size:19px;line-height:1.5}
   #p-notes p,#p-notes li{font-size:19px;margin:6px 0}
@@ -95,12 +96,12 @@ function openPresenter() {
   presenterWin.document.close();
   const d = presenterWin.document;
   wirePreview(d);
-  d.getElementById('p-prev').onclick = () => prev();
-  d.getElementById('p-go').onclick = () => next();
+  d.getElementById('p-prev').onclick = () => { prev(); renderPresenter(); };
+  d.getElementById('p-go').onclick = () => { next(); renderPresenter(); };
   d.getElementById('p-reset').onclick = () => { timerStart = Date.now(); };
   d.addEventListener('keydown', e => {
-    if (['ArrowRight', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); next(); }
-    if (['ArrowLeft', 'PageUp'].includes(e.key)) { e.preventDefault(); prev(); }
+    if (['ArrowRight', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); next(); renderPresenter(); }
+    if (['ArrowLeft', 'PageUp'].includes(e.key)) { e.preventDefault(); prev(); renderPresenter(); }
   });
   presenterWin.addEventListener('resize', renderPresenter);
   // stylesheet moet geladen zijn voor de schaal klopt
@@ -113,7 +114,7 @@ function openPresenter() {
 let presTimer = null;
 new MutationObserver(() => {
   if (!presenterWin || presenterWin.closed) return;
-  clearTimeout(presTimer); presTimer = setTimeout(renderPresenter, 150);
+  if (!presTimer) presTimer = setTimeout(() => { presTimer = null; renderPresenter(); }, 60);
 }).observe(document.getElementById('stage'), { subtree: true, attributes: true, attributeFilter: ['class'], childList: true, characterData: true });
 
 setInterval(() => {

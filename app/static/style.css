@@ -243,3 +243,7 @@ body.idle{cursor:none}
 #laser.pulse{animation:lp .4s ease-out}
 @keyframes lp{0%{box-shadow:0 0 0 0 rgba(255,153,0,.9)}100%{box-shadow:0 0 0 26px rgba(255,153,0,0)}}
 @media print{#laser{display:none!important}}
+
+/* slides hebben altijd hun eigen tekstkleur (ook in de preview van het presentatorvenster) */
+.slide{color:var(--text)}
+.slide.dark{color:#fff}
