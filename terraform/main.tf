@@ -150,7 +150,7 @@ resource "aws_cloudwatch_log_group" "app" {
 }
 
 # Configuratie als bestand in de zip, niet als environment variables:
-# het Howest-account blokkeert kms:Encrypt (SCP), en Lambda versleutelt env vars met KMS.
+# sommige accounts blokkeren kms:Encrypt via een SCP, en Lambda versleutelt env vars met KMS.
 resource "local_sensitive_file" "config" {
   filename = "${path.module}/../app/config.json"
   content = jsonencode({

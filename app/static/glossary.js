@@ -68,7 +68,7 @@ const GLOSSARY = {
       <li>Geen burst credits: altijd de geprovisioneerde snelheid.</li></ul>`,
   },
   gp2: { title: 'gp2', match: ['gp2'], short: 'Oudere General Purpose SSD: 3 IOPS per GiB (min. 100, max. 16.000). Kleine volumes werken met burst credits. Duurder dan gp3.' },
-  io2: { title: 'io2 Block Express', match: ['io2 Block Express', 'io2'], short: 'Provisioned IOPS SSD voor de zwaarste databases: tot 256.000 IOPS, 99,999% duurzaamheid, Multi-Attach. Geblokkeerd in het Howest-account.' },
+  io2: { title: 'io2 Block Express', match: ['io2 Block Express', 'io2'], short: 'Provisioned IOPS SSD voor de zwaarste databases: tot 256.000 IOPS, 99,999% duurzaamheid, Multi-Attach.' },
   st1: { title: 'st1', match: ['st1'], short: 'Throughput Optimized HDD: goedkope harde schijf voor grote sequentiële data (logs, Kafka). Niet als boot-volume.' },
   sc1: { title: 'sc1', match: ['sc1'], short: 'Cold HDD: de goedkoopste EBS-schijf ($0,018/GB) voor data die je zelden leest. Niet als boot-volume. Vaak is S3 een beter idee.' },
   burst: {
@@ -109,12 +109,12 @@ const GLOSSARY = {
     more: `<ul><li>Standaard gebruikt EBS de AWS managed key <code>aws/ebs</code>; je kunt ook een eigen key kiezen.</li>
       <li>De encryptie zelf gebeurt in de Nitro-hardware: geen merkbaar prestatieverlies.</li>
       <li>Versleuteld: data at rest, verkeer tussen instance en volume, snapshots en volumes daaruit.</li></ul>
-      <p class="muted">In het Howest-account blokkeert een SCP <code>kms:Encrypt</code>. Daarom zijn onze demo-volumes niet versleuteld.</p>`,
+      <p class="muted">In ons demo-account blokkeert een SCP <code>kms:Encrypt</code>. Daarom zijn de demo-volumes niet versleuteld.</p>`,
   },
   aes: { title: 'AES-256', match: ['AES-256'], short: 'Een standaard encryptie-algoritme met een sleutel van 256 bits. Zonder de sleutel is de data onleesbaar.' },
   atrest: { title: 'At rest / in transit', match: ['at rest', 'in transit'], short: 'At rest = opgeslagen data op de schijf. In transit = data die onderweg is, hier tussen de EC2-instance en het EBS-volume.' },
   encdefault: { title: 'Encryption by default', match: ['Encryption by default'], short: 'Een instelling per account én per regio: elk nieuw EBS-volume wordt dan automatisch versleuteld. Bestaande volumes veranderen niet.' },
-  scp: { title: 'SCP', match: ['SCP'], short: 'Service Control Policy: een regel van AWS Organizations die bepaalt wat een account maximaal mag, ook als IAM het toelaat. Howest blokkeert zo onder andere KMS-encryptie.' },
+  scp: { title: 'SCP', match: ['SCP'], short: 'Service Control Policy: een regel van AWS Organizations die bepaalt wat een account maximaal mag, ook als IAM het toelaat. Ons demo-account blokkeert zo onder andere KMS-encryptie.' },
   elastic: {
     title: 'Elastic Volumes', match: ['Elastic Volumes'],
     short: 'Grootte, type, IOPS en throughput van een EBS-volume wijzigen terwijl het in gebruik is, zonder downtime.',

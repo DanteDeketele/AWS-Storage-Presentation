@@ -19,7 +19,7 @@ import boto3
 ec2 = boto3.client("ec2")
 ssm = boto3.client("ssm")
 
-# config.json wordt door Terraform geschreven (geen env vars: KMS is geblokkeerd in het Howest-account)
+# config.json wordt door Terraform geschreven (geen env vars: werkt ook in accounts waar een SCP KMS-encryptie blokkeert)
 with open(os.path.join(os.path.dirname(__file__), "config.json"), encoding="utf-8") as _f:
     CFG = json.load(_f)
 TAG = CFG["TAG"]

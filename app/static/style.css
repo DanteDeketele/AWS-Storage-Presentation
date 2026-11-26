@@ -19,7 +19,7 @@ html,body{margin:0;height:100%;background:#0f1b2a;color:var(--text);font-family:
 .slide.active{opacity:1;transform:none;pointer-events:auto}
 .slide.past{transform:translateX(-40px)}
 .slide.center{justify-content:center}
-.slide::after{content:"Lab 06 · AWS Storage · Block storage & Amazon EBS";position:absolute;left:88px;bottom:30px;font-size:15px;color:var(--muted)}
+.slide::after{content:"AWS Storage · Block storage & Amazon EBS";position:absolute;left:88px;bottom:30px;font-size:15px;color:var(--muted)}
 .slide::before{content:"";position:absolute;left:0;right:0;bottom:0;height:6px;background:linear-gradient(90deg,var(--orange),var(--orange-d))}
 
 /* donkere sectieslides */

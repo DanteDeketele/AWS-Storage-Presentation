@@ -224,7 +224,7 @@ addEventListener('pagehide', () => {
   }
 });
 
-// ───── demo-log als tekst (voor vraag 2 van de quiz: commando's + uitvoer, geen screenshot)
+// ───── demo-log als tekst (commando's + uitvoer als tekstbestand)
 document.getElementById('btn-log').addEventListener('click', () => {
   const parts = [...document.querySelectorAll('.slide[data-demo]')].map(sl => {
     const h = sl.querySelector('h2').cloneNode(true); h.querySelectorAll('small').forEach(x => x.remove());

@@ -110,7 +110,7 @@ Boodschap van het schema:
 | Extra prestaties | $0,006/IOPS > 3.000 · $0,0476 per MiB/s > 125 | inbegrepen | $0,078/IOPS (≤32k) · $0,0546 (32–64k) · $0,0382 (>64k) | inbegrepen | inbegrepen |
 
 > Frankfurt is ±19 % duurder dan us-east-1 (gp3 daar $0,08).
-> In het Howest-account zijn **io1/io2 geblokkeerd** en volumes max. **30 GB**.
+> Prijzen voor eu-central-1 (Frankfurt).
 
 ### Waarom vandaag bijna altijd gp3?
 1. **~20 % goedkoper** dan gp2 ($0,095 vs $0,119 per GB).
@@ -187,9 +187,9 @@ Boodschap van het schema:
 
 ## 7. Live demo
 
-> De demo draait nu via de Run-knoppen op de website (zie README). Demo-volumes zijn **niet** versleuteld: het Howest-account blokkeert KMS via een SCP.
+> De demo draait nu via de Run-knoppen op de website (zie README). Demo-volumes zijn **niet** versleuteld: ons demo-account blokkeert KMS via een SCP.
 
-**Doel**: extra gp3-volume (5 GB → 10 GB, opdracht: max. 10 GB) koppelen, filesystem, mount, vergroten zonder downtime, snapshot.
+**Doel**: extra gp3-volume (5 GB → 10 GB) koppelen, filesystem, mount, vergroten zonder downtime, snapshot.
 Infra (VPC/EC2) wordt op voorhand klaargezet met Terraform; de demo zelf doen we live met de CLI zodat het publiek elke stap ziet.
 
 ### Stap 0 — variabelen
@@ -249,7 +249,7 @@ aws ec2 delete-snapshot --snapshot-id $SNAP_ID
 # daarna: terraform destroy
 ```
 
-> Output van elke stap bijhouden als tekst → **vraag 2** van de quiz.
+> De demo-slides kunnen de volledige uitvoer als tekstbestand exporteren.
 
 ---
 

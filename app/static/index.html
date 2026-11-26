@@ -13,7 +13,7 @@
 <!-- 1 ─────────────────────────────── titel -->
 <section class="slide dark center">
   <img class="ico" src="icons/ebs.svg" alt="Amazon EBS" style="width:96px;height:96px">
-  <div class="kicker">Lab 06 · AWS Storage · Onderwerp 1</div>
+  <div class="kicker">AWS Storage · Block storage</div>
   <h1>Block storage<br><em>&amp; Amazon EBS</em></h1>
   <p class="muted" style="max-width:1050px">Deze slides draaien zelf op AWS Lambda. Op de demo-slides maakt elke
     <b class="acc">Run</b>-knop live echte EBS-resources aan in <code>eu-central-1</code>.</p>
@@ -173,10 +173,10 @@
     <tr><td>Extra prestaties</td><td class="hl">$0,006/IOPS · $0,0476/MiB/s</td><td>—</td><td>$0,078/IOPS (≤32k)</td><td>—</td><td>—</td></tr>
     <tr><td>Gebruik</td><td class="hl">Bijna alles</td><td>Legacy</td><td>&gt;80k IOPS, Multi-Attach</td><td>Grote sequentiële data</td><td>Koude data</td></tr>
   </table>
-  <p class="note muted">* enkel op Nitro-instances · io1/io2 zijn geblokkeerd in het Howest-account · prijzen: AWS Price List API, 23/11/2026</p>
+  <p class="note muted">* enkel op Nitro-instances · prijzen: AWS Price List API, 23/11/2026</p>
   <aside class="notes"><p>Vijf types: drie SSD (gp3, gp2, io2) en twee HDD (st1, sc1).</p>
 <ul><li>Kijk naar de oranje kolom: gp3 gaat tot 80.000 IOPS en 64 TiB.</li>
-<li>io2 Block Express is voor extreme databases: 256.000 IOPS, 99,999% duurzaamheid, Multi-Attach. Geblokkeerd in ons Howest-account.</li>
+<li>io2 Block Express is voor extreme databases: 256.000 IOPS, 99,999% duurzaamheid, Multi-Attach.</li>
 <li>HDD's zijn goedkoop maar niet bootbaar en enkel goed voor grote sequentiële data.</li></ul>
 <p>Prijzen zijn voor Frankfurt, uit de AWS Price List API. Frankfurt is ± 19% duurder dan us-east-1.</p>
 <p class="t">± 1,5 min</p></aside>
@@ -250,14 +250,14 @@
         <li class="fade">At rest, in transit EC2 ↔ volume, en snapshots</li>
         <li class="fade"><b>Encryption by default</b>: instelling per regio</li>
         <li class="fade">Bestaand volume: snapshot → versleuteld volume</li>
-        <li class="fade" style="font-size:20px">Howest-account: een SCP blokkeert <code>kms:Encrypt</code> → de demo-volumes zijn <b>niet</b> versleuteld</li>
+        <li class="fade" style="font-size:20px">In ons demo-account blokkeert een SCP <code>kms:Encrypt</code> → de demo-volumes zijn <b>niet</b> versleuteld</li>
       </ul>
     </div>
   </div>
   <aside class="notes"><p><b>Snapshots</b>: de eerste kopieert alle gebruikte blokken, de volgende enkel wat veranderde. Een tussenliggende verwijderen is veilig. Snapshots zijn regionaal.</p>
 <p><b>Encryptie</b>: EBS vraagt een data key aan KMS en versleutelt met AES-256 in de Nitro-hardware. Data at rest, het verkeer naar de instance en de snapshots zijn dan versleuteld.</p>
 <p>Een bestaand volume kun je niet zomaar versleutelen: via een snapshot maak je een versleutelde kopie.</p>
-<p>Bij Howest blokkeert een SCP KMS. Daarom zijn onze demo-volumes onversleuteld.</p>
+<p>In ons demo-account blokkeert een SCP KMS. Daarom zijn onze demo-volumes onversleuteld.</p>
 <p class="t">± 1,5 min</p></aside>
 </section>
 
@@ -416,7 +416,7 @@ cat /data/test.txt</pre>
     <div class="demo-right"><div class="term-bar"><img src="icons/cloudshell.svg" alt="">Uitvoer</div><pre class="term"></pre></div>
   </div>
   <div class="live"></div>
-  <aside class="notes"><p>Run 1: modify-volume naar 10 GB (de opdracht zegt max. 10 GB). De instance blijft gewoon draaien.</p>
+  <aside class="notes"><p>Run 1: modify-volume naar 10 GB (klein gehouden om de kost laag te houden). De instance blijft gewoon draaien.</p>
 <p>Wacht tot de statusbalk <b>optimizing</b> toont.</p>
 <p>Run 2: lsblk toont 10G, maar het filesystem nog 5G. xfs_growfs breidt het uit: df toont 10G en ons testbestand is er nog. Geen downtime.</p></aside>
 </section>
@@ -454,7 +454,7 @@ aws ec2 terminate-instances --instance-ids i-…
       <div class="where"><img class="ico xs" src="icons/cloudshell.svg" alt="">AWS CLI · controle (± 1 min na het opruimen)</div>
       <pre class="code">aws ec2 describe-volumes --filters Name=tag:Project,Values=ebs-demo-live</pre>
       <div class="actions"><button class="btn primary" data-run="verify">Run</button><div class="spin"></div></div>
-      <div class="actions"><button class="btn" id="btn-log">Demo-log downloaden (vraag 2)</button></div>
+      <div class="actions"><button class="btn" id="btn-log">Demo-log downloaden</button></div>
       <p class="note muted">AWS verwijdert storage <b>niet</b> automatisch. Hier doet onze reaper-Lambda dat elke 5 minuten.</p>
     </div>
     <div class="demo-right"><div class="term-bar"><img src="icons/cloudshell.svg" alt="">Uitvoer</div><pre class="term"></pre></div>
@@ -479,7 +479,7 @@ aws ec2 terminate-instances --instance-ids i-…
     <tr><td>Snapshot (bijna leeg)</td><td>gebruikte blokken × $0,054</td><td>&lt; $0,01</td></tr>
     <tr><td>Deze website (Lambda)</td><td>binnen de gratis Lambda-quota</td><td>≈ $0</td></tr>
   </table>
-  <p class="muted">EC2 wordt bij Howest na 12 u gestopt, maar <b>volumes en snapshots blijven</b> → altijd zelf opruimen.</p>
+  <p class="muted">Een gestopte instance kost niets meer, maar <b>volumes en snapshots blijven betalend</b> → altijd zelf opruimen.</p>
   <aside class="notes"><p>Een volledige demo van 20 minuten kost ongeveer één cent: vooral de instance en het publieke IP.</p>
 <p>De storage zelf is goedkoop per uur, maar een vergeten volume betaal je elke maand opnieuw. Ter vergelijking: 10 GB gp3 kost $0,95 per maand, als gp2 $1,19.</p></aside>
 </section>
@@ -571,13 +571,13 @@ aws ec2 terminate-instances --instance-ids i-…
         <text x="76" y="374" class="c" style="font-weight:700">Presentator</text>
         <text x="76" y="392" class="cs">met demo-sleutel</text>
         <image href="icons/res-users.svg" x="44" y="460" width="64" height="64"/>
-        <text x="76" y="544" class="c" style="font-weight:700">Klas</text>
+        <text x="76" y="544" class="c" style="font-weight:700">Publiek</text>
         <text x="76" y="562" class="cs">kijkmodus</text>
 
         <!-- AWS Cloud -->
         <rect x="170" y="14" width="1236" height="612" fill="none" stroke="#232f3e" stroke-width="2"/>
         <image href="icons/grp-cloud.svg" x="170" y="14" width="32" height="32"/>
-        <text x="210" y="36" class="glbl">AWS Cloud · Howest-account</text>
+        <text x="210" y="36" class="glbl">AWS Cloud · demo-account</text>
         <!-- Region -->
         <rect x="188" y="54" width="1200" height="556" fill="none" stroke="#00a4a6" stroke-width="2" stroke-dasharray="8 5"/>
         <image href="icons/grp-region.svg" x="188" y="54" width="32" height="32"/>
@@ -694,7 +694,7 @@ aws ec2 terminate-instances --instance-ids i-…
         <div class="card top"><div class="head"><img class="ico sm" src="icons/grp-vpc.svg" alt=""><h3>Netwerk &amp; overig</h3></div>
           <ul class="tf"><li><code>data.aws_vpc.default</code>, <code>data.aws_subnet.demo</code> (1a)</li><li><code>aws_security_group.demo</code> · geen inbound</li><li><code>data.aws_ami.al2023</code> · nieuwste AL2023</li><li><code>random_password.demo_key</code></li></ul></div>
       </div>
-      <p class="note muted">Waarom geen environment variables? Het Howest-account blokkeert <code>kms:Encrypt</code> via een SCP. Daarom gaat de configuratie als <code>config.json</code> mee in de zip, en zijn de demo-volumes onversleuteld.</p>
+      <p class="note muted">Waarom geen environment variables? Ons demo-account blokkeert <code>kms:Encrypt</code> via een SCP. Daarom gaat de configuratie als <code>config.json</code> mee in de zip, en zijn de demo-volumes onversleuteld.</p>
     </div>
 
     <!-- ── tab 3: commando's ── -->
@@ -704,7 +704,7 @@ aws ec2 terminate-instances --instance-ids i-…
 terraform init</pre></div>
         <div><div class="where">2 · Bekijken wat er gebeurt</div><pre class="code">terraform plan</pre></div>
         <div><div class="where">3 · Opzetten of bijwerken</div><pre class="code">terraform apply</pre></div>
-        <div><div class="where">4 · Link voor de klas</div><pre class="code">terraform output url</pre></div>
+        <div><div class="where">4 · Publieke link (kijkmodus)</div><pre class="code">terraform output url</pre></div>
         <div><div class="where">5 · Demo-sleutel (presentator)</div><pre class="code">terraform output -raw demo_key</pre></div>
         <div><div class="where">6 · Link mét sleutel</div><pre class="code">terraform output -raw presenter_url</pre></div>
         <div><div class="where">7 · Alles afbreken na de week</div><pre class="code">terraform destroy</pre></div>
